@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    // ...existing code...
+    "types": ["node", "@playwright/test"]
+  }
+}
