@@ -1,7 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { LoginPage } from './pages/LoginPage';
 
-test('login page is reachable', async ({ page }) => {
-  await page.goto('');
-  await expect(page).toHaveURL(/\/login\/?$/);
-  await expect(page).toHaveTitle(/.+/);
+test('base url is loaded', async ({ basePage }) => {
+  await expect(basePage).toHaveURL(/\/login\/?$/);
+  const loginPage = new LoginPage(basePage);
+  await loginPage.joinButton.click();
 });
