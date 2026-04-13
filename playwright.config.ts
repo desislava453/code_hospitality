@@ -10,6 +10,7 @@ export default defineConfig({
   use: {
     baseURL: 'https://code-staging-web.on.dev-craft.tech/login',
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
   projects: [
     {
