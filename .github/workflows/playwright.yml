@@ -34,14 +34,15 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  TEST_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.profile || 'full' }}
-  BROWSER_PROJECT: ${{ github.event_name == 'workflow_dispatch' && inputs.browser || 'chromium' }}
 
 jobs:
   test-single-browser:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.browser != 'all' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    env:
+      TEST_PROFILE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.profile || 'full' }}
+      BROWSER_PROJECT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.browser || 'chromium' }}
 
     steps:
       - name: Checkout repository
@@ -60,7 +61,9 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Run Playwright tests
-        run: npm run test:${TEST_PROFILE} -- --project=${BROWSER_PROJECT}
+        run: |
+          echo "Running profile=${TEST_PROFILE} on browser=${BROWSER_PROJECT}"
+          npm run test:${TEST_PROFILE} -- --project=${BROWSER_PROJECT}
 
       - name: Prepare Playwright report for Pages
         if: always()
@@ -87,6 +90,8 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.browser == 'all' }}
     timeout-minutes: 120
     runs-on: ubuntu-latest
+    env:
+      TEST_PROFILE: ${{ github.event.inputs.profile }}
 
     steps:
       - name: Checkout repository
@@ -108,6 +113,7 @@ jobs:
         run: |
           set +e
           overall_exit_code=0
+          echo "Running profile=${TEST_PROFILE} across chromium, firefox, webkit"
 
           for browser in chromium firefox webkit; do
             echo "Running ${browser}"
