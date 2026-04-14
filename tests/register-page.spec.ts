@@ -51,3 +51,29 @@ test('shows error when leave the checkbox unchecked', async ({ basePage }) => {
   await expect(registerPage.requiredFieldError.nth(1)).toBeVisible();
   await expect(registerPage.requiredFieldError.nth(1)).toHaveText('Required field');
 });
+
+test('shows error when email is already registered', async ({ basePage }) => {
+  const registerPage = new RegisterPage(basePage);
+  const loginPage = new LoginPage(basePage);
+  const email = generateRandomEmail();
+  const password = generateRandomPassword();
+
+  await registerPage.fillEmail(email);
+  await console.log(`Generated email: ${email}`);
+  await registerPage.fillPassword(password);
+  await registerPage.selectConsentCheckbox();
+  await registerPage.registerButton.click();
+  await expect(registerPage.verificationPopup).toBeVisible();
+
+  // Attempt to register with the same email again
+  await basePage.goBack({ waitUntil: 'domcontentloaded' });
+  await loginPage.joinHereLink.click();
+  await registerPage.fillEmail(email);
+  await console.log(`Generated email: ${email}`);
+  await registerPage.fillPassword(password);
+  await registerPage.selectConsentCheckbox();
+  await registerPage.registerButton.click();
+
+  await expect(registerPage.errorBanner).toBeVisible();
+  await expect(registerPage.errorBanner).toHaveText('User with this email already exist');
+});
