@@ -9,7 +9,7 @@ export class RegisterPage {
   readonly registerButton: Locator;
   readonly consentCheckbox: Locator;
   readonly verificationPopup: Locator;
-  readonly requiredFieldError: Locator;
+  readonly validationError: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -18,7 +18,7 @@ export class RegisterPage {
     this.registerButton = page.locator('button[type="submit"]');
     this.consentCheckbox = page.getByRole('checkbox');
     this.verificationPopup = page.locator('[id="verificationCodeForm"]');
-    this.requiredFieldError = page.locator('.q-field__messages [role="alert"]');
+    this.validationError = page.locator('.q-field__messages [role="alert"]');
   }
 
   async fillEmail(email: string): Promise<string> {

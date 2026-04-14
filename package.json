@@ -4,7 +4,12 @@
   "description": "Automation QA technical task",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test",
+    "test": "npm run test:full",
+    "test:full": "playwright test",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
     "report": "playwright show-report"
