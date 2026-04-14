@@ -30,14 +30,12 @@ on:
           - chromium
           - firefox
           - webkit
-          - all
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   test-single-browser:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.browser != 'all' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     env:
@@ -82,99 +80,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  test-all-browsers:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.browser == 'all' }}
-    timeout-minutes: 120
-    runs-on: ubuntu-latest
-    env:
-      TEST_PROFILE: ${{ github.event.inputs.profile }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Run Playwright tests on all browsers
-        run: |
-          set +e
-          overall_exit_code=0
-          echo "Running profile=${TEST_PROFILE} across chromium, firefox, webkit"
-
-          for browser in chromium firefox webkit; do
-            echo "Running ${browser}"
-            PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/${browser} npm run test:${TEST_PROFILE} -- --project=${browser}
-            exit_code=$?
-            if [ "$exit_code" -ne 0 ]; then
-              overall_exit_code=1
-            fi
-          done
-
-          exit "$overall_exit_code"
-
-      - name: Create all-browsers report index
-        if: always()
-        run: |
-          cat > playwright-report/index.html <<'EOF'
-          <!doctype html>
-          <html lang="en">
-            <head>
-              <meta charset="utf-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1" />
-              <title>Playwright reports</title>
-              <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; }
-                h1 { margin-bottom: 0.75rem; }
-                ul { line-height: 1.9; }
-              </style>
-            </head>
-            <body>
-              <h1>Playwright report (all browsers)</h1>
-              <ul>
-                <li><a href="./chromium/index.html">Chromium report</a></li>
-                <li><a href="./firefox/index.html">Firefox report</a></li>
-                <li><a href="./webkit/index.html">WebKit report</a></li>
-              </ul>
-            </body>
-          </html>
-          EOF
-
-      - name: Upload combined report pages artifact
-        if: always()
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: playwright-report
-
-      - name: Deploy combined report to GitHub Pages
-        if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Add combined hosted report quick link
-        if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
-        run: |
-          echo "## Hosted Playwright report (all browsers)" >> $GITHUB_STEP_SUMMARY
-          echo "[Open HTML report index](${{ steps.deployment.outputs.page_url }})" >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload raw test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-results-all
           path: test-results/
           if-no-files-found: ignore
           retention-days: 14
