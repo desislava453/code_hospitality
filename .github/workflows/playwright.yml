@@ -62,21 +62,6 @@ jobs:
       - name: Run Playwright tests
         run: npm run test:${TEST_PROFILE} -- --project=${BROWSER_PROJECT}
 
-      - name: Upload Playwright report
-        id: upload-playwright-report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 14
-
-      - name: Add Playwright artifact link
-        if: always()
-        run: |
-          echo "## Playwright report artifact" >> $GITHUB_STEP_SUMMARY
-          echo "[Open report ZIP artifact](${{ steps.upload-playwright-report.outputs.artifact-url }})" >> $GITHUB_STEP_SUMMARY
-
       - name: Prepare Playwright report for Pages
         if: always()
         run: |
@@ -100,15 +85,8 @@ jobs:
 
   test-all-browsers:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.browser == 'all' }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        browser:
-          - chromium
-          - firefox
-          - webkit
 
     steps:
       - name: Checkout repository
@@ -126,96 +104,26 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
-      - name: Run Playwright tests
-        run: npm run test:${TEST_PROFILE} -- --project=${{ matrix.browser }}
+      - name: Run Playwright tests on all browsers
+        run: |
+          set +e
+          overall_exit_code=0
 
-      - name: Upload Playwright report
-        id: upload-playwright-report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-${{ matrix.browser }}
-          path: playwright-report/
-          retention-days: 14
+          for browser in chromium firefox webkit; do
+            echo "Running ${browser}"
+            PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/${browser} npm run test:${TEST_PROFILE} -- --project=${browser}
+            exit_code=$?
+            if [ "$exit_code" -ne 0 ]; then
+              overall_exit_code=1
+            fi
+          done
 
-      - name: Add Playwright report quick link
+          exit "$overall_exit_code"
+
+      - name: Create all-browsers report index
         if: always()
         run: |
-          echo "## Playwright report (${{ matrix.browser }})" >> $GITHUB_STEP_SUMMARY
-          echo "[Open Playwright report artifact](${{ steps.upload-playwright-report.outputs.artifact-url }})" >> $GITHUB_STEP_SUMMARY
-
-      - name: Prepare browser report bundle for Pages
-        if: always()
-        run: |
-          mkdir -p playwright-report-pages-${{ matrix.browser }}
-          cp -r playwright-report/. playwright-report-pages-${{ matrix.browser }}/
-
-      - name: Upload browser report bundle
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-pages-${{ matrix.browser }}
-          path: playwright-report-pages-${{ matrix.browser }}/
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload raw test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-results-${{ matrix.browser }}
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  deploy-playwright-report-pages:
-    needs: test-single-browser
-    if: ${{ always() && needs.test-single-browser.result != 'skipped' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy Playwright report to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Add hosted Playwright report quick link
-        run: |
-          echo "## Hosted Playwright report" >> $GITHUB_STEP_SUMMARY
-          echo "[Open HTML report](${{ steps.deployment.outputs.page_url }})" >> $GITHUB_STEP_SUMMARY
-
-  deploy-playwright-report-pages-all:
-    needs: test-all-browsers
-    if: ${{ always() && needs.test-all-browsers.result != 'skipped' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Download chromium report bundle
-        uses: actions/download-artifact@v5
-        with:
-          name: playwright-report-pages-chromium
-          path: playwright-report-pages-all/chromium
-
-      - name: Download firefox report bundle
-        uses: actions/download-artifact@v5
-        with:
-          name: playwright-report-pages-firefox
-          path: playwright-report-pages-all/firefox
-
-      - name: Download webkit report bundle
-        uses: actions/download-artifact@v5
-        with:
-          name: playwright-report-pages-webkit
-          path: playwright-report-pages-all/webkit
-
-      - name: Create report index page
-        run: |
-          cat > playwright-report-pages-all/index.html <<'EOF'
+          cat > playwright-report/index.html <<'EOF'
           <!doctype html>
           <html lang="en">
             <head>
@@ -240,15 +148,45 @@ jobs:
           EOF
 
       - name: Upload combined report pages artifact
+        if: always()
         uses: actions/upload-pages-artifact@v3
         with:
-          path: playwright-report-pages-all
+          path: playwright-report
 
       - name: Deploy combined report to GitHub Pages
+        if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
         id: deployment
         uses: actions/deploy-pages@v4
 
       - name: Add combined hosted report quick link
+        if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
         run: |
           echo "## Hosted Playwright report (all browsers)" >> $GITHUB_STEP_SUMMARY
           echo "[Open HTML report index](${{ steps.deployment.outputs.page_url }})" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload raw test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-all
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  deploy-playwright-report-pages:
+    needs: test-single-browser
+    if: ${{ always() && needs.test-single-browser.result != 'skipped' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Playwright report to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Add hosted Playwright report quick link
+        run: |
+          echo "## Hosted Playwright report" >> $GITHUB_STEP_SUMMARY
+          echo "[Open HTML report](${{ steps.deployment.outputs.page_url }})" >> $GITHUB_STEP_SUMMARY
